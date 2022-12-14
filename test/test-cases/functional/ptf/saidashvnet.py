@@ -81,19 +81,19 @@ class Vnet2VnetInboundTest(VnetAPI):
         | port1    | port1_rif |
         +----------+-----------+
         """
-        self.PA_VALIDATION_SIP = "10.10.2.10"  # PA validation PERMIT
-        self.ENI_MAC = "00:01:00:00:03:14"     # ENI MAC address
-        self.VM_VNI = 1     # DST VM VNI (Inbound VNI)
-        self.ROUTE_VNI = 2  # Inbound route VNI
+        self.PA_VALIDATION_SIP = "192.168.2.10"  # PA validation PERMIT
+        self.ENI_MAC = "88:ba:ce:98:d9:e2"     # ENI MAC address
+        self.VM_VNI = 3     # DST VM VNI (Inbound VNI)
+        self.ROUTE_VNI = 10  # Inbound route VNI
 
-        self.VIP_ADDRESS = "10.1.1.1"  # Appliance IP address
+        self.VIP_ADDRESS = "192.168.1.112"  # Appliance IP address
 
-        self.OUTER_DMAC = "aa:bb:cc:dd:ee:11"  # DST MAC for outer VxLAN pkt and Neighbor MAC
-        self.OUTER_DIP = "10.10.1.10"          # DST IP for outer IP pkt and Next-hop/Neighbor IP
+        self.OUTER_DMAC = "aa:bb:cc:11:22:33"  # DST MAC for outer VxLAN pkt and Neighbor MAC
+        self.OUTER_DIP = "10.10.20.20"          # DST IP for outer IP pkt and Next-hop/Neighbor IP
 
         # SDN Appliance rif`s MAC addresses
-        self.RIF0_RIF_MAC = "00:77:66:55:44:00"
-        self.RIF1_RIF_MAC = "00:88:77:66:55:00"
+        self.RIF0_RIF_MAC = "44:00:00:00:88:99"
+        self.RIF1_RIF_MAC = "44:33:33:22:55:66"
 
     def runTest(self):
         self.configureTest()
@@ -112,7 +112,7 @@ class Vnet2VnetInboundTest(VnetAPI):
 
         nhop = self.nexthop_create(rif1, self.OUTER_DIP)
         self.neighbor_create(rif1, self.OUTER_DIP, self.OUTER_DMAC)
-        self.route_create("10.10.1.0/24", nhop)
+        self.route_create("10.10.20.20/24", nhop)
 
         # Overlay routing
         self.vip_create(self.VIP_ADDRESS)  # Appliance VIP
@@ -131,26 +131,26 @@ class Vnet2VnetInboundTest(VnetAPI):
 
         # Inbound routing PA Validate
         self.inbound_routing_decap_validate_create(eni_id, vni=self.ROUTE_VNI,  # routing VNI lookup = 2
-                                                   sip="10.10.2.0", sip_mask="255.255.255.0", src_vnet_id=vnet2)
+                                                   sip="192.168.2.10", sip_mask="255.255.255.255", src_vnet_id=vnet2)
         # PA validation entry with Permit action
         self.pa_validation_create(self.PA_VALIDATION_SIP, vnet2)
 
         # Create VxLAN packets
         self.inner_pkt = simple_tcp_packet(eth_dst=self.ENI_MAC,
-                                           eth_src="20:30:40:50:60:70",
-                                           ip_dst="192.168.0.1",
-                                           ip_src="192.168.1.1",
+                                           eth_src="4a:7f:01:3b:a2:71",
+                                           ip_dst="10.10.3.2",
+                                           ip_src="10.10.2.3",
                                            ip_id=108,
                                            ip_ttl=64)
 
         self.vxlan_pkt = simple_vxlan_packet(eth_dst=self.RIF0_RIF_MAC,
-                                             eth_src="aa:bb:cc:11:22:33",
+                                             eth_src="9e:ba:ce:98:d9:e2",
                                              ip_dst=self.VIP_ADDRESS,
                                              ip_src=self.PA_VALIDATION_SIP,
                                              ip_id=0,
                                              ip_ttl=64,
                                              ip_flags=0x2,
-                                             with_udp_chksum=False,
+                                             with_udp_chksum=True,
                                              vxlan_vni=self.ROUTE_VNI,
                                              inner_frame=self.inner_pkt)
 
@@ -161,7 +161,7 @@ class Vnet2VnetInboundTest(VnetAPI):
                                                  ip_id=0,
                                                  ip_ttl=64,
                                                  ip_flags=0x2,
-                                                 with_udp_chksum=False,
+                                                 with_udp_chksum=True,
                                                  vxlan_vni=self.VM_VNI,
                                                  inner_frame=self.inner_pkt)
 
@@ -261,6 +261,10 @@ class Vnet2VnetOutboundRouteVnetDirectTest(VnetAPI):
         self.SRC_VM_VNI = 1
         self.DST_VM_VNI = 2
 
+        # SDN Appliance rif`s MAC addresses
+        self.RIF0_RIF_MAC = "00:77:66:55:44:00"
+        self.RIF1_RIF_MAC = "00:88:77:66:55:00"
+
     def configureTest(self):
         """
         Setup DUT in accordance with test purpose
@@ -281,29 +285,35 @@ class Vnet2VnetOutboundRouteVnetDirectTest(VnetAPI):
         # outbound routing
         self.outbound_routing_vnet_direct_create(eni_id, "192.168.1.0/24", vnet_id_2,
                                                  overlay_ip="192.168.1.10")
-        self.outbound_ca_to_pa_create(vnet_id_2,  # DST vnet id
+        self.outbound_ca_to_pa_create(vnet_id_2,       # DST vnet id
                                       "192.168.1.10",  # DST IP addr
-                                      "10.10.2.10")  # Underlay DIP
+                                      "10.10.2.10",    # Underlay DIP
+                                      overlay_dmac="20:30:40:50:60:AA")
         # underlay routing
-        self.router_interface_create(self.port1)
-        rif0 = self.router_interface_create(self.port0, src_mac="00:77:66:55:44:00")
-        nhop = self.nexthop_create(rif0, "10.10.2.10")
-        self.neighbor_create(rif0, "10.10.2.10", "aa:bb:cc:11:22:33")
+        self.router_interface_create(self.port0, src_mac=self.RIF0_RIF_MAC)
+        rif1 = self.router_interface_create(self.port1, src_mac=self.RIF1_RIF_MAC)
+        nhop = self.nexthop_create(rif1, "10.10.2.10")
+        self.neighbor_create(rif1, "10.10.2.10", "aa:bb:cc:11:22:33")
         self.route_create("10.10.2.0/24", nhop)
 
     def runTest(self):
         self.configureTest()
 
         # send packet and check
-        inner_pkt = simple_udp_packet(eth_src=self.ENI_MAC,
+        inner_pkt = simple_tcp_packet(eth_src=self.ENI_MAC,
                                       eth_dst="20:30:40:50:60:70",
                                       ip_dst="192.168.1.1",
                                       ip_src="192.168.0.1",
                                       ip_ttl=64,
-                                      ip_ihl=5,
-                                      with_udp_chksum=True)
+                                      ip_ihl=5)
+        exp_inner_pkt = simple_tcp_packet(eth_src=self.ENI_MAC,
+                                      eth_dst="20:30:40:50:60:AA",
+                                      ip_dst="192.168.1.1",
+                                      ip_src="192.168.0.1",
+                                      ip_ttl=64,
+                                      ip_ihl=5)
 
-        vxlan_pkt = simple_vxlan_packet(eth_dst="00:00:cc:11:22:33",
+        vxlan_pkt = simple_vxlan_packet(eth_dst=self.RIF0_RIF_MAC,
                                         eth_src="00:00:66:00:44:00",
                                         ip_dst=self.VIP_ADDRESS,
                                         ip_src="10.10.1.10",
@@ -312,16 +322,15 @@ class Vnet2VnetOutboundRouteVnetDirectTest(VnetAPI):
                                         ip_ttl=0,
                                         ip_ihl=5,
                                         ip_id=0,
-                                        udp_sport=5000,
                                         vxlan_flags=0x8,
-                                        vxlan_reserved0=None,
+                                        vxlan_reserved0=0,
                                         vxlan_reserved1=0,
                                         vxlan_reserved2=0,
                                         ip_flags=0x2,
                                         inner_frame=inner_pkt)
 
         exp_vxlan_pkt = simple_vxlan_packet(eth_dst="aa:bb:cc:11:22:33",
-                                            eth_src="00:77:66:55:44:00",
+                                            eth_src=self.RIF1_RIF_MAC,
                                             ip_dst="10.10.2.10",
                                             ip_src=self.VIP_ADDRESS,
                                             with_udp_chksum=True,
@@ -329,17 +338,16 @@ class Vnet2VnetOutboundRouteVnetDirectTest(VnetAPI):
                                             ip_ttl=0,
                                             ip_ihl=5,
                                             ip_id=0,
-                                            udp_sport=5000,
                                             vxlan_flags=0x8,
-                                            vxlan_reserved0=None,
+                                            vxlan_reserved0=0,
                                             vxlan_reserved1=0,
                                             vxlan_reserved2=0,
                                             ip_flags=0x2,
-                                            inner_frame=inner_pkt)
+                                            inner_frame=exp_inner_pkt)
 
         print("Sending VxLAN IPv4 packet, expect VxLAN IPv4 packet forwarded")
-        send_packet(self, self.dev_port1, vxlan_pkt)
-        verify_packet(self, exp_vxlan_pkt, self.dev_port0)
+        send_packet(self, self.dev_port0, vxlan_pkt)
+        verify_packet(self, exp_vxlan_pkt, self.dev_port1)
 
 
 @group("draft")

@@ -38,16 +38,53 @@ class VnetObjects(SaiHelperSimplified):
 
     def destroy_teardown_obj(self):
         for obj_func, obj_args in self.teardown_objects:
+            # print("Running:", obj_func.__name__, obj_args)
             if isinstance(obj_args, (list, tuple)):
                 obj_func(*obj_args)
             else:
                 obj_func(obj_args)
             self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+            # print("OK")
 
 
 class VnetAPI(VnetObjects):
     def setUp(self):
         super(VnetAPI, self).setUp()
+
+    def check_cpu_port_hdl(self):
+        """
+        Checks cpu port handler.
+        Expect the cpu_port_hdl equals to qos_queue port id, number_of_queues in qos equals to queue index.
+
+        Needs the following class attributes:
+
+            self.cpu_port_hdl - cpu_port_hdl id
+
+        Seds the following class attributes:
+
+            self.cpu_queueX - cpu queue id
+
+        """
+        #TODO move this function to CommonSaiHelper
+        attr = sai_thrift_get_port_attribute(self.client,
+                                             self.cpu_port_hdl,
+                                             qos_number_of_queues=True)
+        num_queues = attr['qos_number_of_queues']
+        q_list = sai_thrift_object_list_t(count=num_queues)
+        attr = sai_thrift_get_port_attribute(self.client,
+                                             self.cpu_port_hdl,
+                                             qos_queue_list=q_list)
+        for queue in range(0, num_queues):
+            queue_id = attr['qos_queue_list'].idlist[queue]
+            setattr(self, 'cpu_queue%s' % queue, queue_id)
+            q_attr = sai_thrift_get_queue_attribute(
+                self.client,
+                queue_id,
+                port=True,
+                index=True,
+                parent_scheduler_node=True)
+            # self.assertEqual(queue, q_attr['index'])
+            # self.assertEqual(self.cpu_port_hdl, q_attr['port'])
 
     def tearDown(self):
         self.destroy_teardown_obj()
@@ -143,7 +180,6 @@ class VnetAPI(VnetObjects):
 
         direction_lookup_entry = sai_thrift_direction_lookup_entry_t(switch_id=self.switch_id, vni=vni)
         sai_thrift_create_direction_lookup_entry(self.client, direction_lookup_entry, action=act)
-
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         self.add_teardown_obj(self.direction_lookup_remove, direction_lookup_entry)
 
