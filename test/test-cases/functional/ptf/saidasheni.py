@@ -39,6 +39,7 @@ class CreateDeleteEniTest(VnetAPI):
         self.flows = 100000      # ENI flows
         self.admin_state = True  # ENI admin state
         self.vm_vni = 10         # ENI VM VNI
+        self.outbound_vm_vni = 10000
         self.eni_mac = '00:11:22:33:44:55'  # ENI MAC address
         self.vm_underlay_dip = sai_ipaddress('192.168.1.5')  # ENI VM underlay DIP
 
@@ -92,7 +93,7 @@ class CreateDeleteEniTest(VnetAPI):
         self.vm_vnet = self.vnet_create(vni=self.vm_vni)
 
         # src_vnet for Inbound routing entry
-        self.outbound_vnet = self.vnet_create(vni=10000)
+        self.outbound_vnet = self.vnet_create(vni=self.outbound_vm_vni)
 
     def createDirectionLookupTest(self):
         """
@@ -133,7 +134,7 @@ class CreateDeleteEniTest(VnetAPI):
         """
 
         self.inbound_routing_entry = self.inbound_routing_decap_validate_create(
-            eni_id=self.eni, vni=self.vm_vni,
+            eni_id=self.eni, vni=self.outbound_vm_vni,
             sip=self.sip, sip_mask="255.255.255.0",
             src_vnet_id=self.outbound_vnet)
 
