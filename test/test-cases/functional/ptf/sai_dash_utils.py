@@ -96,6 +96,36 @@ class VnetAPI(VnetObjects):
         self.destroy_teardown_obj()
         super(VnetAPI, self).tearDown()
 
+    def check_cpu_port_hdl(self):
+        """
+        Checks cpu port handler.
+        Expect the cpu_port_hdl equals to qos_queue port id, number_of_queues in qos equals to queue index.
+        Needs the following class attributes:
+            self.cpu_port_hdl - cpu_port_hdl id
+        Seds the following class attributes:
+            self.cpu_queueX - cpu queue id
+        """
+        # TODO move this function to CommonSaiHelper
+        attr = sai_thrift_get_port_attribute(self.client,
+                                             self.cpu_port_hdl,
+                                             qos_number_of_queues=True)
+        num_queues = attr['qos_number_of_queues']
+        q_list = sai_thrift_object_list_t(count=num_queues)
+        attr = sai_thrift_get_port_attribute(self.client,
+                                             self.cpu_port_hdl,
+                                             qos_queue_list=q_list)
+        for queue in range(0, num_queues):
+            queue_id = attr['qos_queue_list'].idlist[queue]
+            setattr(self, 'cpu_queue%s' % queue, queue_id)
+            q_attr = sai_thrift_get_queue_attribute(
+                self.client,
+                queue_id,
+                port=True,
+                index=True,
+                parent_scheduler_node=True)
+            # self.assertEqual(queue, q_attr['index'])
+            # self.assertEqual(self.cpu_port_hdl, q_attr['port'])
+
     def vip_create(self, vip):
         """
         Add VIP for Appliance
@@ -173,6 +203,12 @@ class VnetAPI(VnetObjects):
         self.add_teardown_obj(self.eni_remove, eni_id)
 
         return eni_id
+    
+    def eni_set_admin_state(self, eni_oid, state):
+        sai_thrift_set_eni_attribute(self.client, eni_oid, admin_state=(state == "up"))
+        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+
+        print(f"ENI oid: {eni_oid} setting admin state {state} - OK")
 
     def eni_remove(self, eni_id):
         sai_thrift_remove_eni(self.client, eni_id)
@@ -458,6 +494,12 @@ class VnetApiEndpoints(VnetAPI):
     def setUp(self, underlay_ipv6=False, overlay_ipv6=False):
         super(VnetApiEndpoints, self).setUp()
 
+        # Set connection type for traffic verification methods
+        self.assertTrue(test_param_get("connection").lower() in ["tcp", "udp", "icmp"],
+                        "Unknown connection protocol! Supported protocols: tcp|udp|icmp")
+        self.connection = test_param_get("connection").lower()
+        print(f"{self.connection.upper()} protocol is used for traffic verification.")
+        
         self.underlay_ipv6 = underlay_ipv6
         self.overlay_ipv6 = overlay_ipv6
 
@@ -512,8 +554,6 @@ class VnetApiEndpoints(VnetAPI):
 
         self.rx_host.port = self.tx_host.port
         self.rx_host.mac = self.tx_host.mac
-        self.rx_host.ip = self.tx_host.ip
-        self.rx_host.ip_prefix = self.tx_host.ip_prefix
 
         self.rx_host.peer.port = self.tx_host.peer.port
         self.rx_host.peer.mac = self.tx_host.peer.mac

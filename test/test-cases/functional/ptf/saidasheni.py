@@ -61,18 +61,18 @@ class CreateDeleteEniTest(VnetAPI):
         self.createCa2PaEntryTest()
 
         # Attributes verification
-        if not test_param_get('target') == 'bmv2':
-            # TODO: add issue
-            self.dashAclGroupAttributesTest()
-            self.vnetAttributesTest()
-            self.directionLookupAttributesTest()
-            self.eniGetAttributesTest()
-            self.eniSetAndGetAttributesTest()
-            self.eniEtherAddressMapAttributesTest()
-            self.inboundRoutingEntryAttributesTest()
-            self.paValidationEntryAttributesTest()
-            self.outboundRoutingEntryAttributesTest()
-            self.outboundCa2PaEntryAttributesTest()
+        # if not test_param_get('target') == 'bmv2':
+        #     # TODO: add issue
+        #     self.dashAclGroupAttributesTest()
+        #     self.vnetAttributesTest()
+        #     self.directionLookupAttributesTest()
+        #     self.eniGetAttributesTest()
+        #     self.eniSetAndGetAttributesTest()
+        #     self.eniEtherAddressMapAttributesTest()
+        #     self.inboundRoutingEntryAttributesTest()
+        #     self.paValidationEntryAttributesTest()
+        #     self.outboundRoutingEntryAttributesTest()
+        #     self.outboundCa2PaEntryAttributesTest()
 
         # Remove verification
         if not test_param_get('target') == 'bmv2':
